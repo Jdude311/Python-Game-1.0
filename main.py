@@ -1,4 +1,5 @@
 import math
+import numpy
 import time
 import pygame
 
@@ -17,9 +18,32 @@ class GameObjectPlayer(GameObject):
         super().__init__(name, position)
         self.width = 25
         self.height = 25
+        self.angle = 0
+        self.xsp = 0
+        self.ysp = 0
 
     def draw(self, screen):
         pygame.draw.rect(screen, (255, 255, 255), (self.x, self.y, self.width, self.height))
+      
+    def move(self, directions):
+        if directions[pygame.K_d] or directions[pygame.K_a] or directions[pygame.K_s] or directions[pygame.K_w]:
+            if directions[pygame.K_d]:
+                self.xsp += 1 + self.xsp * 0.001
+            if directions[pygame.K_a]:
+                self.xsp -= 1 + self.xsp * 0.001
+            if directions[pygame.K_s]:
+                self.ysp += 1 + self.ysp * 0.001
+            if directions[pygame.K_w]:
+                self.ysp -= 1 + self.ysp * 0.001
+        else:
+            seli f.xsp = self.xsp*0.999 + 1*numpy.sign(self.xsp) if self.xsp == 0 else 0
+            self.ysp = self.ysp * 0.999 + 1*numpy.sign(self.ysp) if self.ysp == 0 else 0
+        
+        self.xsp = numpy.clip(self.xsp, -5, 5)
+        self.ysp = numpy.clip(self.ysp, -5, 5)
+        
+        self.x += self.xsp
+        self.y += self.ysp
 
 
 class GameObjectBlock(GameObject):
@@ -44,15 +68,17 @@ class GameObjectProjectile(GameObject):
         if self.x + self.width + self.xsp >= screen.get_size()[0] or self.x + self.xsp <= 0:
             self.xsp = -self.xsp
         else:
-            self.xsp = self.xsp * 0.98
+            self.xsp = self.xsp * 0.95
         if self.y + self.height + self.ysp >= screen.get_size()[1] or self.y + self.ysp <= 0:
             self.ysp = -self.ysp
         else:
-            self.ysp = round((self.ysp + 2) * 0.98)  # Only gravity if not on ground
+            self.ysp = round((self.ysp + 2) * 0.95)  # Only gravity if not on ground
+        # Move object
         self.x += self.xsp
         self.y += self.ysp
+        # Set angle using methamphet--I mean, math
         self.angle = abs(-math.atan2(self.ysp, self.xsp) - math.pi)
-        print(round(math.degrees(self.angle)))
+        #print(round(math.degrees(self.angle)))
 
     def draw(self, screen):
         pygame.draw.rect(screen, (255, 0, 0), (self.x, self.y, self.width, self.height))
@@ -71,11 +97,12 @@ class GameObjectProjectileBullet(GameObjectProjectile):
 
 # Set up game
 pygame.init()
-screen = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
+screen = pygame.display.set_mode((300, 300), pygame.RESIZABLE)
 block1 = GameObjectBlock("joe", (1, 2))
 projectile1 = GameObjectProjectile("proj", (0, 300), (10, 10), math.pi/4, 50)
-bullet1 = GameObjectProjectileBullet("bullet", (0,300), (10, 10), math.pi/4, 50)
-pygame.display.update()
+player = GameObjectPlayer("player", (100, 100))
+#bullet1 = GameObjectProjectileBullet("bullet", (0,300), (10, 10), math.pi/4, 50)
+#pygame.display.update()
 
 # Game loop
 running = True;
@@ -83,11 +110,17 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    screen.fill("black")
+            
+    keys = pygame.key.get_pressed()
+    # Update objects
+    player.move(keys)
     projectile1.move()
+    # Empty screen
+    screen.fill("black")
+    # Draw objects
     projectile1.draw(screen)
-    bullet1.move()
-    bullet1.draw(screen)
+    player.draw(screen)
+    # Frefresh Screen
     pygame.display.update()
     time.sleep(0.0166666667)
 
