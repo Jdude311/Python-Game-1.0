@@ -12,6 +12,15 @@ class GameObject:
     def __str__(self):
         return self.name + " at position (" + str(self.x) + ", " + str(self.y) + ")\n"
 
+class GameObjectPlayer(GameObject):
+    def __init__(self, name, position):
+        super().__init__(name, position)
+        self.width = 25
+        self.height = 25
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, (255, 255, 255), (self.x, self.y, self.width, self.height))
+
 
 class GameObjectBlock(GameObject):
     "Nonmoving object with position. Used for blocks."
@@ -32,34 +41,40 @@ class GameObjectProjectile(GameObject):
 
     def move(self):
         "Move the object. Must be called each frame."
-        if self.x + self.width + self.xsp >= 300 or self.x + self.xsp <= 0:
+        if self.x + self.width + self.xsp >= screen.get_size()[0] or self.x + self.xsp <= 0:
             self.xsp = -self.xsp
         else:
-            self.xsp = self.xsp * 0.95
-        
-        if self.y + self.height + self.ysp >= screen.getSize() or self.y + self.ysp <= 0:
+            self.xsp = self.xsp * 0.98
+        if self.y + self.height + self.ysp >= screen.get_size()[1] or self.y + self.ysp <= 0:
             self.ysp = -self.ysp
         else:
-            self.ysp = round((self.ysp + 2) * 0.95)  # Only gravity if not on ground
-
+            self.ysp = round((self.ysp + 2) * 0.98)  # Only gravity if not on ground
         self.x += self.xsp
         self.y += self.ysp
         self.angle = abs(-math.atan2(self.ysp, self.xsp) - math.pi)
         print(round(math.degrees(self.angle)))
 
-
-
-
     def draw(self, screen):
         pygame.draw.rect(screen, (255, 0, 0), (self.x, self.y, self.width, self.height))
 
 
+class GameObjectProjectileBullet(GameObjectProjectile):
+    "Special class for bullets."
+    def __init__(self, name, position, dimensions, angle, speed):
+        super().__init__(name, position, dimensions, angle, speed)
+        self.sprite = pygame.image.load("bullet.png").convert()
+        self.sprite = pygame.transform.scale(self.sprite, (50, 50))
+
+    def draw(self, screen):
+        screen.blit(self.sprite, self.sprite.get_rect(center=(100,100)))
+
+
 # Set up game
 pygame.init()
-surface = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
+screen = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
 block1 = GameObjectBlock("joe", (1, 2))
-projectile1 = GameObjectProjectile("bullet", (0, 300), (10, 10), math.pi/3, 25)
-pygame.draw.circle(surface, (255, 0, 0), (30, 30), 10)
+projectile1 = GameObjectProjectile("proj", (0, 300), (10, 10), math.pi/4, 50)
+bullet1 = GameObjectProjectileBullet("bullet", (0,300), (10, 10), math.pi/4, 50)
 pygame.display.update()
 
 # Game loop
@@ -68,9 +83,11 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    surface.fill("black")
+    screen.fill("black")
     projectile1.move()
-    projectile1.draw(surface)
+    projectile1.draw(screen)
+    bullet1.move()
+    bullet1.draw(screen)
     pygame.display.update()
     time.sleep(0.0166666667)
 
