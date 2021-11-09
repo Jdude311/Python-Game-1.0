@@ -5,60 +5,78 @@ import pygame
 
 
 class GameObject:
-    def __init__(self, name, position):
+    def __init__(self, name, position, dimensions):
         self.name = str(name)
         self.x = position[0]
         self.y = position[1]
-
+        self.width = dimensions[0]
+        self.height = dimensions[1]
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+    
     def __str__(self):
         return self.name + " at position (" + str(self.x) + ", " + str(self.y) + ")\n"
+    
+    def draw(self, screen):
+        pygame.draw.rect(screen, (255, 0, 0), self.rect)
+
+    def checkCollision(self, entity_rect):
+        if self.rect.collideRect(entity_rect):
+            return True;
+        else: 
+            return False;
+
 
 class GameObjectPlayer(GameObject):
-    def __init__(self, name, position):
-        super().__init__(name, position)
-        self.width = 25
-        self.height = 25
+    def __init__(self, name, position, dimensions):
+        super().__init__(name, position, dimensions)
         self.angle = 0
         self.xsp = 0
         self.ysp = 0
+        self.speed = 0
 
-    def draw(self, screen):
-        pygame.draw.rect(screen, (255, 255, 255), (self.x, self.y, self.width, self.height))
-      
-    def move(self, directions):
-        if directions[pygame.K_d] or directions[pygame.K_a] or directions[pygame.K_s] or directions[pygame.K_w]:
-            if directions[pygame.K_d]:
-                self.xsp += 1 + self.xsp * 0.001
-            if directions[pygame.K_a]:
-                self.xsp -= 1 + self.xsp * 0.001
-            if directions[pygame.K_s]:
-                self.ysp += 1 + self.ysp * 0.001
-            if directions[pygame.K_w]:
-                self.ysp -= 1 + self.ysp * 0.001
+    def takeInput(self, input):
+        angleSum = 0
+        angleNumber = 0
+        if input[pygame.K_d] or input[pygame.K_a] or input[pygame.K_s] or input[pygame.K_w]:
+            self.speed = numpy.maximum(1 + self.speed * 0.001, 5)
+            if input[pygame.K_a]:
+                angleSum += math.pi
+                angleNumber += 1
+            if input[pygame.K_s]:
+                angleSum += math.pi/2
+                angleNumber += 1
+            if input[pygame.K_w]:
+                angleSum += 3*math.pi/2
+                angleNumber += 1
+            if input[pygame.K_d] and angleSum % (math.pi * 2) < math.pi:
+                angleSum += 0
+                angleNumber += 1
+            elif input[pygame.K_d] and angleSum % (math.pi * 2) >= math.pi:
+                angleSum += math.pi * 2
+                angleNumber += 1
+            self.angle = (angleSum / angleNumber)
         else:
-            seli f.xsp = self.xsp*0.999 + 1*numpy.sign(self.xsp) if self.xsp == 0 else 0
-            self.ysp = self.ysp * 0.999 + 1*numpy.sign(self.ysp) if self.ysp == 0 else 0
+            self.speed = numpy.minimum(self.speed*0.999 + 1 if self.speed != 0 else 0, 0)
         
-        self.xsp = numpy.clip(self.xsp, -5, 5)
-        self.ysp = numpy.clip(self.ysp, -5, 5)
-        
+        self.xsp = self.speed * math.cos(self.angle)
+        self.ysp = self.speed * math.sin(self.angle)
+
+    def move(self):        
         self.x += self.xsp
         self.y += self.ysp
 
 
 class GameObjectBlock(GameObject):
     "Nonmoving object with position. Used for blocks."
-    def __init__(self, name, position):
-        super().__init__(name, position)
+    def __init__(self, name, position, dimensions):
+        super().__init__(name, position, dimensions)
 
 
 class GameObjectProjectile(GameObject):
     "This type of object has a speed, which contains information for x and y speed. It is a list."
     def __init__(self, name, position, dimensions, angle, speed):
-        super().__init__(name, position)
+        super().__init__(name, position, dimensions)
         self.speed = speed
-        self.width = dimensions[0]
-        self.height = dimensions[1]
         self.angle = angle
         self.xsp = math.cos(self.angle) * self.speed
         self.ysp = math.sin(self.angle) * self.speed
@@ -80,9 +98,6 @@ class GameObjectProjectile(GameObject):
         self.angle = abs(-math.atan2(self.ysp, self.xsp) - math.pi)
         #print(round(math.degrees(self.angle)))
 
-    def draw(self, screen):
-        pygame.draw.rect(screen, (255, 0, 0), (self.x, self.y, self.width, self.height))
-
 
 class GameObjectProjectileBullet(GameObjectProjectile):
     "Special class for bullets."
@@ -97,12 +112,19 @@ class GameObjectProjectileBullet(GameObjectProjectile):
 
 # Set up game
 pygame.init()
-screen = pygame.display.set_mode((300, 300), pygame.RESIZABLE)
-block1 = GameObjectBlock("joe", (1, 2))
-projectile1 = GameObjectProjectile("proj", (0, 300), (10, 10), math.pi/4, 50)
-player = GameObjectPlayer("player", (100, 100))
-#bullet1 = GameObjectProjectileBullet("bullet", (0,300), (10, 10), math.pi/4, 50)
-#pygame.display.update()
+#screen = pygame.display.set_mode((300, 300), pygame.RESIZABLE)
+screen = pygame.display.set_mode((640, 480), pygame.RESIZABLE)
+
+entities = []
+# Blocks
+entities.append(GameObjectBlock("block", (0, 275), (100, 25)))
+
+# Projectiles
+entities.append(GameObjectProjectile("proj", (0, 300), (10, 10), math.pi/4, 50))
+
+# Player
+entities.append(GameObjectPlayer("player", (100, 100), (50,50)))
+
 
 # Game loop
 running = True;
@@ -112,15 +134,17 @@ while running:
             running = False
             
     keys = pygame.key.get_pressed()
-    # Update objects
-    player.move(keys)
-    projectile1.move()
-    # Empty screen
+    # Clear Screen
     screen.fill("black")
-    # Draw objects
-    projectile1.draw(screen)
-    player.draw(screen)
-    # Frefresh Screen
+    # Update object states
+    for entity in entities:
+        if callable(getattr(entity, "takeInput", None)):  # Take input
+            entity.takeInput(keys)
+        if callable(getattr(entity, "move", None)):  # Move objects
+            entity.move()
+        if callable(getattr(entity, "draw", None)):  # Draw objects
+            entity.draw(screen)
+    # Refresh Screen
     pygame.display.update()
     time.sleep(0.0166666667)
 
